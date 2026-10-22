@@ -15,8 +15,10 @@ Hold **Left Shift** with the build tool, aim, **left click**. The first part is 
 | **Horizontale** | A flat row along the part's own directions: floors and walls along the axes, **pivoted (diagonal) walls along their diagonal**, slopes along their ramp. Aiming up or down never bends it. |
 | **Verticale** | A column straight up or down (stacked walls, floors, pillars). |
 | **Diagonale** | A row in any of the 26 directions: **stairs** of floors, diagonal rows of walls, 3D diagonals. |
+| **Pyramide** | With a slope corner (lower or upper): one big flat triangle in the corners' sloped plane, lower and upper corners tiling it, one piece narrower on every row. Aim up to narrow it upwards (lower corners along the base), down to narrow it downwards (upper corners along the top). |
 | **Zone** (area) | A rectangle in the plane of the first part: floors, walls, **whole diagonal wall surfaces**, slope roofs. Turn off "Zone à plat" for the old 3D box. |
 
+- Slope corners zoop like slopes: rows along the axes, and up their ramps.
 - Spots already taken and parts you cannot pay for show in **red** and are skipped (the server does not check either, so nothing gets overwritten). The key tip shows how many parts will be placed and how many lack materials.
 - Works with floating parts (step = part size) and with the **recycler** to remove a line, diagonal or area of panels (or a box of floating parts).
 - **Backspace** undoes the last zoop (removes what it placed, or puts back what it removed). Up to 30 steps.

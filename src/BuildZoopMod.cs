@@ -189,7 +189,8 @@ namespace BuildZoop
             });
             ModUi.Note("Horizontale : rangée à plat (murs diagonaux le long de leur diagonale, pentes le long de leur rampe). "
                 + "Verticale : empilement vers le haut ou le bas. Diagonale : les 26 directions (escaliers, murs en biais). "
-                + "Zone : rectangle dans le plan de la pièce.");
+                + "Zone : rectangle dans le plan de la pièce. "
+                + "Pyramide (avec un coin de pente) : grand triangle de coins de pente bas et haut, une pièce de moins à chaque rangée, vers le haut ou vers le bas.");
             ModUi.EndSection();
 
             ModUi.BeginSection("Copie au clic molette");

@@ -2,7 +2,7 @@
     "id": "buildzoop",
     "name": "Build Zoop",
     "author": "tidic84",
-    "version": "1.2.0",
-    "description": "Satisfactory-style zoop for the build tool and the recycler: horizontal lines, vertical lines, diagonals and areas (up to 10000 parts) that follow your aim into empty space, with undo. Diagonal walls line up into diagonal walls (and whole diagonal wall surfaces), slopes into ramps, floors into stairs. Slope corners can sit next to a diagonal wall in the same voxel, like next to a straight wall. Occupied spots and parts you cannot pay for show in red and are skipped. Also middle click pick (with rotation and settings), placement lock with nudging, rotation lock and circuit copy. Replaces Build Plus (remove it). Needs SDModKit.",
+    "version": "1.3.0",
+    "description": "Satisfactory-style zoop for the build tool and the recycler: horizontal lines, vertical lines, diagonals, areas and slope-corner triangles (up to 10000 parts) that follow your aim into empty space, with undo. Diagonal walls line up into diagonal walls (and whole diagonal wall surfaces), slopes into ramps, floors into stairs. Slope corners can sit next to a diagonal wall in the same voxel, like next to a straight wall. Occupied spots and parts you cannot pay for show in red and are skipped. Also middle click pick (with rotation and settings), placement lock with nudging, rotation lock and circuit copy. Replaces Build Plus (remove it). Needs SDModKit.",
     "thumbnail": "Thumbnail.png"
 }

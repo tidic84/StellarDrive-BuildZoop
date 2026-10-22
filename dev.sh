@@ -5,7 +5,11 @@ export DOTNET_ROOT="$HOME/.dotnet" PATH="$HOME/.dotnet:$PATH" DOTNET_CLI_TELEMET
 GAME="/mnt/c/Program Files (x86)/Steam/steamapps/common/StellarDrive Demo"
 LOG="$GAME/MelonLoader/Latest.log"
 cd "$(dirname "$0")"
-taskkill.exe /IM StellarDrive.exe /F > /dev/null 2>&1 || true
+# Never close a game the player has open: only with FORCE=1 (once they have handed it over).
+if tasklist.exe 2>/dev/null | grep -qi "StellarDrive.exe"; then
+  if [ "${FORCE:-0}" != "1" ]; then echo "StellarDrive is running: close it or rerun with FORCE=1"; exit 2; fi
+  taskkill.exe /IM StellarDrive.exe /F > /dev/null 2>&1 || true
+fi
 dotnet build src/BuildZoop.csproj -c Release -p:DefineConstants=DEV -nologo -v q 2>&1 | grep -E "rror CS" && exit 1
 sleep 2
 cp src/bin/Release/BuildZoop.dll "$GAME/Mods/"

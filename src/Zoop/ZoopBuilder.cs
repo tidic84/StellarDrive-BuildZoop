@@ -65,6 +65,9 @@ namespace BuildZoop.Zoop
 
         private static readonly List<Vector3Int> Offsets = new List<Vector3Int>();
         private static readonly List<HullPartPlacement> HullPlan = new List<HullPartPlacement>();
+        // The part each plan entry places (a pyramid mixes slopes and slope corners).
+        private static readonly List<PartSettings> HullPlanSettings = new List<PartSettings>();
+        private static List<Vector3Int> _lineDirections;
         private static readonly List<FloatingPartPlacement> FloatPlan = new List<FloatingPartPlacement>();
         private static readonly List<bool> Valid = new List<bool>();
         private static readonly List<HullPart> HullDoomed = new List<HullPart>();
@@ -192,6 +195,7 @@ namespace BuildZoop.Zoop
             _floating = false;
             Offsets.Clear();
             HullPlan.Clear();
+            HullPlanSettings.Clear();
             FloatPlan.Clear();
             Valid.Clear();
             HullDoomed.Clear();
@@ -261,6 +265,22 @@ namespace BuildZoop.Zoop
                 _hullStep = ZoopGeometry.HullStep(_settings.size, placement.ForwardOrientation);
             _step = _hullStep;
             ZoopGeometry.HullPlane(placement, out _u, out _v, out _w);
+            _lineDirections = ZoopGeometry.HorizontalDirections(_u, _v, _w);
+            if (Pyramid.IsCorner(_settings))
+            {
+                // Slope corners zoop like slopes: rows along the axes, and up their ramps (the two slope ramps
+                // and the hip between them); areas lie flat.
+                Vector3Int f = ZoopGeometry.Sign(placement.ForwardOrientation.GetVector3());
+                _u = Vector3Int.right;
+                _v = new Vector3Int(0, 0, 1);
+                _w = Vector3Int.up;
+                _lineDirections = ZoopGeometry.HorizontalDirections(_u, _v, _w);
+                foreach (var ramp in new[] { new Vector3Int(-f.x, f.y, 0), new Vector3Int(0, f.y, -f.z), new Vector3Int(-f.x, f.y, -f.z) })
+                {
+                    if (!_lineDirections.Contains(ramp)) _lineDirections.Add(ramp);
+                    if (!_lineDirections.Contains(-ramp)) _lineDirections.Add(-ramp);
+                }
+            }
             Started();
         }
 
@@ -336,7 +356,10 @@ namespace BuildZoop.Zoop
                     switch (Settings.CurrentMode)
                     {
                         case ZoopMode.Line:
-                            FollowLine(origin, ray, ZoopGeometry.HorizontalDirections(_u, _v, _w));
+                            FollowLine(origin, ray, _floating ? ZoopGeometry.HorizontalDirections(_u, _v, _w) : _lineDirections);
+                            break;
+                        case ZoopMode.Pyramid when !_floating && Pyramid.TryFamily(_settings, out _):
+                            FollowPyramid(origin, ray);
                             break;
                         case ZoopMode.Vertical:
                             FollowLine(origin, ray, ZoopGeometry.VerticalDirections);
@@ -412,6 +435,23 @@ namespace BuildZoop.Zoop
             FillArea(_u, _areaI, _v, _areaJ, Vector3Int.zero, 0);
         }
 
+        /// <summary>
+        /// Triangle of slope corners: the aim, taken in the sloped plane of the corners, gives the width along the
+        /// row (from the first corner) and how many rows up or down.
+        /// </summary>
+        private static void FollowPyramid(Vector3 origin, Vector3 ray)
+        {
+            Vector3Int f = Pyramid.LowerForward(_anchorHull, _settings);
+            Vector3Int row = Pyramid.RowDirection(f);
+            if (ZoopGeometry.RayToPlane(origin, ray, _anchorLocal, ((Vector3)f).normalized, out Vector3 hit))
+            {
+                Vector3 rel = hit - _anchorLocal;
+                _areaI = Mathf.RoundToInt(Vector3.Dot(rel, row) / 2f);
+                _areaJ = Mathf.RoundToInt(rel.y);
+            }
+            Offsets.Clear();
+        }
+
         private static void FollowBox(BuildToolLocalClient build, RecyclerTool recycler, bool buildActive)
         {
             Vector3? current = null;
@@ -478,6 +518,7 @@ namespace BuildZoop.Zoop
         private static void Evaluate(IShipPartPlacements grid, IShipStateRead ship)
         {
             HullPlan.Clear();
+            HullPlanSettings.Clear();
             FloatPlan.Clear();
             Valid.Clear();
             HullDoomed.Clear();
@@ -491,14 +532,20 @@ namespace BuildZoop.Zoop
                 return;
 
             // Parts past what the inventory pays for turn red and are not sent.
-            int affordable = Affordable(_settings);
+            var state = PlayerAccess.LocalNetworkState;
+            if (state == null || state.IsUsingCheatFreeBuild)
+                return;
+            var counts = PlayerAccess.CurrentCounts();
             for (int i = 0; i < Valid.Count; i++)
             {
                 if (!Valid[i])
                     continue;
-                if (affordable > 0)
+                var cost = (_floating ? _settings : HullPlanSettings[i]).BuildingCost;
+                if (cost == null || cost.TrueForAll(item => counts.TryGetValue(item.ItemId, out int have) && have >= item.Quantity))
                 {
-                    affordable--;
+                    if (cost != null)
+                        foreach (var item in cost)
+                            counts[item.ItemId] -= item.Quantity;
                     continue;
                 }
                 Valid[i] = false;
@@ -506,35 +553,42 @@ namespace BuildZoop.Zoop
             }
         }
 
-        private static int Affordable(PartSettings settings)
-        {
-            var state = PlayerAccess.LocalNetworkState;
-            var cost = settings == null ? null : settings.BuildingCost;
-            if (state == null || state.IsUsingCheatFreeBuild || cost == null)
-                return int.MaxValue;
-            var counts = PlayerAccess.CurrentCounts();
-            int n = int.MaxValue;
-            foreach (var item in cost)
-            {
-                if (item.Quantity == 0)
-                    continue;
-                counts.TryGetValue(item.ItemId, out int have);
-                n = Mathf.Min(n, have / item.Quantity);
-            }
-            return n;
-        }
-
         private static void EvaluateHull(IShipPartPlacements grid, IShipStateRead ship)
         {
             var type = _anchorHull.Position.Type;
             if (type == Pairing.SharedVoxel.Second)
                 type = VoxelPartType.Interior;
-            var seen = new HashSet<Vector3Int>();
-            foreach (var offset in Offsets)
+            var seen = new HashSet<HullPartPosition>();
+            var seenInterior = new HashSet<Vector3Int>();
+            var candidates = new List<HullPartPlacement>();
+            var candidateSettings = new List<PartSettings>();
+            var optional = new List<bool>();
+            if (Settings.CurrentMode == ZoopMode.Pyramid && Pyramid.TryFamily(_settings, out var family))
             {
-                Vector3Int coord = _anchorHull.Coord + Vector3Int.Scale(offset, _hullStep);
-                var placement = _anchorHull;
-                placement.Position = new HullPartPosition(coord, type);
+                bool fromUpper = _settings.snappingStyle == SnappingStyle.SlopedCornerInv;
+                Pyramid.Build(_anchorHull.Coord, fromUpper, Pyramid.LowerForward(_anchorHull, _settings), _areaI >= 0 ? 1 : -1,
+                    Mathf.Abs(_areaI) + 1, Mathf.Abs(_areaJ) + 1, _areaJ >= 0, family, Mathf.Max(1, Settings.Limit.Value), candidates, candidateSettings);
+                foreach (var unused in candidates)
+                    optional.Add(false);
+            }
+            else
+            {
+                foreach (var offset in Offsets)
+                {
+                    var p = _anchorHull;
+                    p.Position = new HullPartPosition(_anchorHull.Coord + Vector3Int.Scale(offset, _hullStep), type);
+                    candidates.Add(p);
+                    candidateSettings.Add(_settings);
+                    optional.Add(false);
+                }
+            }
+            for (int n = 0; n < candidates.Count; n++)
+            {
+                var placement = candidates[n];
+                var settings = candidateSettings[n];
+                Vector3Int coord = placement.Coord;
+                if (optional[n] && !grid.IsHullPartAvailable(placement.Position))
+                    continue;
 
                 if (_removing)
                 {
@@ -545,20 +599,22 @@ namespace BuildZoop.Zoop
                 }
 
                 bool ok = true;
-                if (type == VoxelPartType.Interior || type == Pairing.SharedVoxel.Second)
+                var partType = placement.Position.Type;
+                if (partType == VoxelPartType.Interior || partType == Pairing.SharedVoxel.Second)
                 {
                     // Interior parts may share a voxel with the other half of a wall + slope corner pair.
-                    ok = seen.Add(coord) && Pairing.SharedVoxel.Resolve(ship, _settings, ref placement);
+                    ok = seenInterior.Add(coord) && Pairing.SharedVoxel.Resolve(ship, settings, ref placement);
                 }
                 else
                 {
-                    foreach (var c in placement.CalculateAllCoords(_settings.size))
+                    foreach (var c in placement.CalculateAllCoords(settings.size))
                     {
-                        if (!seen.Add(c) || !grid.IsHullPartAvailable(c, type))
+                        if (!seen.Add(new HullPartPosition(c, partType)) || !grid.IsHullPartAvailable(c, partType))
                             ok = false;
                     }
                 }
                 HullPlan.Add(placement);
+                HullPlanSettings.Add(settings);
                 Valid.Add(ok);
             }
         }
@@ -608,7 +664,7 @@ namespace BuildZoop.Zoop
                     Ghosts.Part(part.Settings, part.HullPlacement, false);
             else
                 for (int i = 0; i < HullPlan.Count; i++)
-                    Ghosts.Part(_settings, HullPlan[i], Valid[i]);
+                    Ghosts.Part(HullPlanSettings[i], HullPlan[i], Valid[i]);
         }
 
         // ---------------------------------------------------------------- commit and undo
@@ -652,9 +708,9 @@ namespace BuildZoop.Zoop
                 for (int i = 0; i < HullPlan.Count; i++)
                 {
                     if (!Valid[i]) continue;
-                    { var request = new PlaceHullPartNetworkRequest { ShipId = _shipId, SettingsId = _settings.id, Placement = HullPlan[i] }; Send(() => net.PlaceHullPart(request)); }
+                    { var request = new PlaceHullPartNetworkRequest { ShipId = _shipId, SettingsId = HullPlanSettings[i].id, Placement = HullPlan[i] }; Send(() => net.PlaceHullPart(request)); }
                     batch.Hull.Add(HullPlan[i]);
-                    batch.HullSettings.Add(_settings.id);
+                    batch.HullSettings.Add(HullPlanSettings[i].id);
                 }
                 for (int i = 0; i < FloatPlan.Count; i++)
                 {
