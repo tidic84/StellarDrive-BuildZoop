@@ -7,7 +7,8 @@ namespace BuildZoop
     {
         Line,
         Diagonal,
-        Area
+        Area,
+        Vertical
     }
 
     public static class Settings
@@ -31,19 +32,30 @@ namespace BuildZoop
         public static Keybind PickKey;
         public static Keybind RotationLockKey;
 
+        public const int MaxLimit = 10000;
+
+        /// <summary>The order the mode key goes through.</summary>
+        public static readonly ZoopMode[] ModeOrder = { ZoopMode.Line, ZoopMode.Vertical, ZoopMode.Diagonal, ZoopMode.Area };
+
         public static ZoopMode CurrentMode
         {
-            get => (ZoopMode)(((Mode.Value % 3) + 3) % 3);
+            get => Mode.Value >= 0 && Mode.Value <= 3 ? (ZoopMode)Mode.Value : ZoopMode.Line;
             set => Mode.Value = (int)value;
+        }
+
+        public static void NextMode()
+        {
+            int i = System.Array.IndexOf(ModeOrder, CurrentMode);
+            CurrentMode = ModeOrder[(i + 1) % ModeOrder.Length];
         }
 
         public static void Bind(ConfigFile config)
         {
             ZoopEnabled = config.Bind("Zoop", "Enabled", true, "Hold the zoop key with the build tool or the recycler to place or remove many parts at once.");
-            Mode = config.Bind("Zoop", "Mode", 0, "0 = line, 1 = diagonal, 2 = area.");
+            Mode = config.Bind("Zoop", "Mode", 0, "0 = horizontal line, 3 = vertical line, 1 = diagonal, 2 = area.");
             HoldToZoop = config.Bind("Zoop", "Hold", true, "Hold the key to zoop; off = press once to start, again to cancel.");
             FlatArea = config.Bind("Zoop", "FlatArea", true, "Areas stay in the plane of the first part (off = 3D box).");
-            Limit = config.Bind("Zoop", "Limit", 400, "Most parts placed in one go.");
+            Limit = config.Bind("Zoop", "MaxParts", 2000, "Most parts placed in one go (up to 10000).");
 
             PickEnabled = config.Bind("Pick", "Enabled", true, string.Empty);
             PickEquipsBuildTool = config.Bind("Pick", "EquipBuildTool", true, string.Empty);
@@ -57,9 +69,10 @@ namespace BuildZoop
         {
             switch (mode)
             {
+                case ZoopMode.Vertical: return "Verticale";
                 case ZoopMode.Diagonal: return "Diagonale";
                 case ZoopMode.Area: return "Zone";
-                default: return "Ligne";
+                default: return "Horizontale";
             }
         }
     }

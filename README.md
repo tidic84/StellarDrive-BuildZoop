@@ -12,14 +12,15 @@ Hold **Left Shift** with the build tool, aim, **left click**. The first part is 
 
 | Mode | What it lays |
 | --- | --- |
-| **Ligne** (line) | A straight row along the part's own directions. Floors and walls go along the axes; **pivoted (diagonal) walls go along their diagonal**, slopes go up their ramp, and every part can also stack up or down. |
+| **Horizontale** | A flat row along the part's own directions: floors and walls along the axes, **pivoted (diagonal) walls along their diagonal**, slopes along their ramp. Aiming up or down never bends it. |
+| **Verticale** | A column straight up or down (stacked walls, floors, pillars). |
 | **Diagonale** | A row in any of the 26 directions: **stairs** of floors, diagonal rows of walls, 3D diagonals. |
 | **Zone** (area) | A rectangle in the plane of the first part: floors, walls, **whole diagonal wall surfaces**, slope roofs. Turn off "Zone à plat" for the old 3D box. |
 
 - Spots already taken and parts you cannot pay for show in **red** and are skipped (the server does not check either, so nothing gets overwritten). The key tip shows how many parts will be placed and how many lack materials.
 - Works with floating parts (step = part size) and with the **recycler** to remove a line, diagonal or area of panels (or a box of floating parts).
 - **Backspace** undoes the last zoop (removes what it placed, or puts back what it removed). Up to 30 steps.
-- Options in the mod menu: hold or toggle the key, flat or 3D areas, max parts per zoop (400).
+- Options in the mod menu: hold or toggle the key, flat or 3D areas, max parts per zoop (2000 by default, up to 10000). Big zoops are sent over a few seconds (120 parts per frame) so the server keeps up; the key tip shows what is left to send.
 
 ## From Build Plus
 

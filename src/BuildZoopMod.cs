@@ -64,6 +64,7 @@ namespace BuildZoop
             }
             if (!GameRefs.InWorld)
                 return;
+            ZoopBuilder.Pump();
 
             BuildToolLocalClient build = ToolRefs.Build;
             bool buildActive = ToolRefs.BuildActive;
@@ -155,7 +156,7 @@ namespace BuildZoop
             ModUi.Row("Activé", () => Settings.ZoopEnabled.Value = ModUi.Toggle(Settings.ZoopEnabled.Value, string.Empty));
             ModUi.Row("Mode", () =>
             {
-                foreach (ZoopMode mode in Enum.GetValues(typeof(ZoopMode)))
+                foreach (ZoopMode mode in Settings.ModeOrder)
                 {
                     bool on = Settings.CurrentMode == mode;
                     if (ModUi.Button((on ? "> " : string.Empty) + Settings.ModeName(mode), 100f))
@@ -173,18 +174,21 @@ namespace BuildZoop
                 Settings.FlatArea.Value = ModUi.Toggle(Settings.FlatArea.Value, string.Empty);
                 GUILayout.Label(Settings.FlatArea.Value ? "dans le plan de la 1re pièce" : "boîte 3D", Theme.Status);
             });
-            ModUi.Row("Max pièces", () => Settings.Limit.Value = ModUi.Int(Settings.Limit.Value, 1, 4000, 90f));
+            ModUi.Row("Max pièces", () => Settings.Limit.Value = ModUi.Int(Settings.Limit.Value, 1, Settings.MaxLimit, 90f));
             ModUi.Row("État", () =>
             {
-                if (ZoopBuilder.Active)
+                if (ZoopBuilder.Sending > 0)
+                    GUILayout.Label("envoi : " + ZoopBuilder.Sending + " restantes", Theme.GoodText);
+                else if (ZoopBuilder.Active)
                     GUILayout.Label(ZoopBuilder.Count + " prévues", Theme.GoodText);
                 else
                     GUILayout.Label(ZoopBuilder.LastAction ?? ZoopBuilder.Status ?? "en attente", Theme.Status);
                 if (ZoopBuilder.CanUndo && ModUi.Button("Annuler", 80f))
                     ZoopBuilder.Undo();
             });
-            ModUi.Note("Ligne : droite le long des axes ; murs diagonaux et pentes suivent leur propre direction. "
-                + "Diagonale : les 26 directions (escaliers, rampes, murs en biais). Zone : rectangle dans le plan de la pièce.");
+            ModUi.Note("Horizontale : rangée à plat (murs diagonaux le long de leur diagonale, pentes le long de leur rampe). "
+                + "Verticale : empilement vers le haut ou le bas. Diagonale : les 26 directions (escaliers, murs en biais). "
+                + "Zone : rectangle dans le plan de la pièce.");
             ModUi.EndSection();
 
             ModUi.BeginSection("Copie au clic molette");

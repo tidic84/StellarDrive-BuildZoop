@@ -9,6 +9,11 @@ taskkill.exe /IM StellarDrive.exe /F > /dev/null 2>&1 || true
 dotnet build src/BuildZoop.csproj -c Release -p:DefineConstants=DEV -nologo -v q 2>&1 | grep -E "rror CS" && exit 1
 sleep 2
 cp src/bin/Release/BuildZoop.dll "$GAME/Mods/"
+# Test world: a copy of an existing save (ship 7 there is a row of three floor panels).
+W="/mnt/c/Users/tidic/AppData/LocalLow/CuriousOwlGames/StellarDrive/WorldSaves"
+if [ ! -f "$W/BZ_Test/world.json" ]; then
+  mkdir -p "$W/BZ_Test" && cp "$W/Better Research Table/"{world.json,world.jpg,creative.mode,sdmodkit-content.json} "$W/BZ_Test/"
+fi
 rm -f "$LOG"
 (cd "$GAME" && cmd.exe /c start "" StellarDrive.exe -screen-fullscreen 0 -screen-width 1280 -screen-height 720 < /dev/null > /dev/null 2>&1 &)
 for i in $(seq 1 180); do

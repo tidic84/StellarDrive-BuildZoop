@@ -93,21 +93,29 @@ namespace BuildZoop.Zoop
             return new Vector3Int(0, 0, v.z >= 0 ? 1 : -1);
         }
 
-        /// <summary>Line candidates: both ways along the panel's two in-plane directions and across it, plus the axes.</summary>
-        public static List<Vector3Int> LineDirections(Vector3Int u, Vector3Int v, Vector3Int w)
+        /// <summary>
+        /// Horizontal line candidates: both ways along the panel's in-plane directions and across it, without the
+        /// straight up and down ones. A slope keeps its ramp (it is the slope's own line), a pivoted wall its diagonal.
+        /// </summary>
+        public static List<Vector3Int> HorizontalDirections(Vector3Int u, Vector3Int v, Vector3Int w)
         {
             var list = new List<Vector3Int>();
-            foreach (var d in new[] { u, v, w })
+            foreach (var d in new[] { u, v })
             {
+                if (d.x == 0 && d.z == 0)
+                    continue;
                 Add(list, d);
                 Add(list, -d);
             }
-            // Axis-aligned panels already gave the axes; pivoted walls and slopes keep only their own directions
-            // plus straight up and down, so a line of diagonal walls never turns into a staircase by accident.
-            Add(list, Vector3Int.up);
-            Add(list, Vector3Int.down);
+            if (w.y == 0)
+            {
+                Add(list, w);
+                Add(list, -w);
+            }
             return list;
         }
+
+        public static readonly Vector3Int[] VerticalDirections = { Vector3Int.up, Vector3Int.down };
 
         private static void Add(List<Vector3Int> list, Vector3Int d)
         {

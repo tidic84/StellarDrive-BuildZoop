@@ -35,7 +35,11 @@ namespace BuildZoop.Zoop
             public int Count => Hull.Count + Floating.Count;
         }
 
+        private const int SendsPerFrame = 120;
+
         private static readonly GhostSet Ghosts = new GhostSet("BuildZoopGhosts");
+        // Big zoops go out over several frames so thousands of requests do not land on the server at once.
+        private static readonly Queue<System.Action> Outbox = new Queue<System.Action>();
         private static readonly List<Batch> History = new List<Batch>();
 
         private static bool _active;
@@ -84,6 +88,30 @@ namespace BuildZoop.Zoop
             }
         }
 
+        public static int Sending => Outbox.Count;
+
+        private static void Send(System.Action request)
+        {
+            Outbox.Enqueue(request);
+        }
+
+        /// <summary>Sends the next queued requests; runs every frame, whatever tool is out.</summary>
+        public static void Pump()
+        {
+            for (int i = 0; i < SendsPerFrame && Outbox.Count > 0; i++)
+            {
+                try
+                {
+                    Outbox.Dequeue()();
+                }
+                catch (System.Exception)
+                {
+                    // Left the world or lost the ship: drop what is left.
+                    Outbox.Clear();
+                }
+            }
+        }
+
         public static void Update()
         {
             bool buildActive = ToolRefs.BuildActive;
@@ -97,7 +125,7 @@ namespace BuildZoop.Zoop
 
             if (Settings.ModeKey != null && Settings.ModeKey.Pressed && !LocalPlayer.GameMenuOpen)
             {
-                Settings.CurrentMode = (ZoopMode)(((int)Settings.CurrentMode + 1) % 3);
+                Settings.NextMode();
                 _dir = Vector3Int.zero;
             }
             if (Settings.UndoKey != null && Settings.UndoKey.Pressed && !LocalPlayer.GameMenuOpen)
@@ -140,6 +168,7 @@ namespace BuildZoop.Zoop
         public static void Reset()
         {
             Cancel();
+            Outbox.Clear();
             _toggled = false;
             History.Clear();
             LastAction = null;
@@ -273,7 +302,10 @@ namespace BuildZoop.Zoop
                     switch (Settings.CurrentMode)
                     {
                         case ZoopMode.Line:
-                            FollowLine(origin, ray, ZoopGeometry.LineDirections(_u, _v, _w));
+                            FollowLine(origin, ray, ZoopGeometry.HorizontalDirections(_u, _v, _w));
+                            break;
+                        case ZoopMode.Vertical:
+                            FollowLine(origin, ray, ZoopGeometry.VerticalDirections);
                             break;
                         case ZoopMode.Diagonal:
                             FollowLine(origin, ray, ZoopGeometry.AllDirections);
@@ -378,17 +410,12 @@ namespace BuildZoop.Zoop
             Offsets.Clear();
             int sa = na < 0 ? -1 : 1, sb = nb < 0 ? -1 : 1, sc = nc < 0 ? -1 : 1;
             na = Mathf.Abs(na); nb = Mathf.Abs(nb); nc = Mathf.Abs(nc);
-            // Grow outwards from the first part so every new panel touches one already sent.
+            // Grow outwards from the first part (ring = i + j + k) so every new panel touches one already sent.
             int maxRing = na + nb + nc;
             for (int ring = 0; ring <= maxRing && Offsets.Count < limit; ring++)
-                for (int i = 0; i <= na && Offsets.Count < limit; i++)
-                    for (int j = 0; j <= nb && Offsets.Count < limit; j++)
-                    {
-                        int k = ring - i - j;
-                        if (k < 0 || k > nc)
-                            continue;
-                        Offsets.Add(a * (i * sa) + b * (j * sb) + c * (k * sc));
-                    }
+                for (int i = 0; i <= Mathf.Min(na, ring) && Offsets.Count < limit; i++)
+                    for (int j = Mathf.Max(0, ring - i - nc); j <= Mathf.Min(nb, ring - i) && Offsets.Count < limit; j++)
+                        Offsets.Add(a * (i * sa) + b * (j * sb) + c * ((ring - i - j) * sc));
         }
 
         private static void TrackFloatingRemoval(RecyclerTool recycler, IShipStateRead ship)
@@ -561,14 +588,14 @@ namespace BuildZoop.Zoop
                 for (int i = HullDoomed.Count - 1; i >= 0; i--)
                 {
                     var part = HullDoomed[i];
-                    net.RemoveHullPart(new RemoveHullPartNetworkRequest { ShipId = _shipId, Position = part.HullPlacement.Position });
+                    { var request = new RemoveHullPartNetworkRequest { ShipId = _shipId, Position = part.HullPlacement.Position }; Send(() => net.RemoveHullPart(request)); }
                     batch.Hull.Add(part.HullPlacement);
                     batch.HullSettings.Add(part.Settings.id);
                 }
                 for (int i = FloatDoomed.Count - 1; i >= 0; i--)
                 {
                     var part = FloatDoomed[i];
-                    net.RemoveFloatingPart(new RemoveFloatingPartNetworkRequest { ShipId = _shipId, PartId = part.Id });
+                    { var request = new RemoveFloatingPartNetworkRequest { ShipId = _shipId, PartId = part.Id }; Send(() => net.RemoveFloatingPart(request)); }
                     if (part.Placement is FloatingPartPlacement fp)
                     {
                         batch.Floating.Add(fp);
@@ -581,14 +608,14 @@ namespace BuildZoop.Zoop
                 for (int i = 0; i < HullPlan.Count; i++)
                 {
                     if (!Valid[i]) continue;
-                    net.PlaceHullPart(new PlaceHullPartNetworkRequest { ShipId = _shipId, SettingsId = _settings.id, Placement = HullPlan[i] });
+                    { var request = new PlaceHullPartNetworkRequest { ShipId = _shipId, SettingsId = _settings.id, Placement = HullPlan[i] }; Send(() => net.PlaceHullPart(request)); }
                     batch.Hull.Add(HullPlan[i]);
                     batch.HullSettings.Add(_settings.id);
                 }
                 for (int i = 0; i < FloatPlan.Count; i++)
                 {
                     if (!Valid[i]) continue;
-                    net.PlaceFloatingPart(new PlaceFloatingPartNetworkRequest { ShipId = _shipId, SettingsId = _settings.id, Placement = FloatPlan[i] });
+                    { var request = new PlaceFloatingPartNetworkRequest { ShipId = _shipId, SettingsId = _settings.id, Placement = FloatPlan[i] }; Send(() => net.PlaceFloatingPart(request)); }
                     batch.Floating.Add(FloatPlan[i]);
                     batch.FloatingSettings.Add(_settings.id);
                 }
@@ -614,6 +641,11 @@ namespace BuildZoop.Zoop
                 LastAction = "rien à annuler";
                 return;
             }
+            if (Outbox.Count > 0)
+            {
+                LastAction = "envoi en cours, réessayez dans un instant";
+                return;
+            }
             var net = GameRefs.Service<IShipInteractionNetworkService>();
             var ship = Aim.Ship(History[History.Count - 1].ShipId);
             if (net == null || ship == null)
@@ -631,9 +663,9 @@ namespace BuildZoop.Zoop
             {
                 // Put the removed parts back, nearest first.
                 for (int i = batch.Hull.Count - 1; i >= 0; i--, done++)
-                    net.PlaceHullPart(new PlaceHullPartNetworkRequest { ShipId = batch.ShipId, SettingsId = batch.HullSettings[i], Placement = batch.Hull[i] });
+                    { var request = new PlaceHullPartNetworkRequest { ShipId = batch.ShipId, SettingsId = batch.HullSettings[i], Placement = batch.Hull[i] }; Send(() => net.PlaceHullPart(request)); }
                 for (int i = batch.Floating.Count - 1; i >= 0; i--, done++)
-                    net.PlaceFloatingPart(new PlaceFloatingPartNetworkRequest { ShipId = batch.ShipId, SettingsId = batch.FloatingSettings[i], Placement = batch.Floating[i] });
+                    { var request = new PlaceFloatingPartNetworkRequest { ShipId = batch.ShipId, SettingsId = batch.FloatingSettings[i], Placement = batch.Floating[i] }; Send(() => net.PlaceFloatingPart(request)); }
                 LastAction = "annulé : " + done + " pièces remises";
                 return;
             }
@@ -644,7 +676,7 @@ namespace BuildZoop.Zoop
                 if (!part.HasValue || part.Value.Settings == null || part.Value.Settings.id != batch.HullSettings[i])
                     continue;
                 anyThere = true;
-                net.RemoveHullPart(new RemoveHullPartNetworkRequest { ShipId = batch.ShipId, Position = batch.Hull[i].Position });
+                { var request = new RemoveHullPartNetworkRequest { ShipId = batch.ShipId, Position = batch.Hull[i].Position }; Send(() => net.RemoveHullPart(request)); }
                 done++;
             }
             if (batch.Floating.Count > 0)
@@ -658,7 +690,7 @@ namespace BuildZoop.Zoop
                         continue;
                     anyThere = true;
                     parts.Remove(match);
-                    net.RemoveFloatingPart(new RemoveFloatingPartNetworkRequest { ShipId = batch.ShipId, PartId = match.Id });
+                    { var request = new RemoveFloatingPartNetworkRequest { ShipId = batch.ShipId, PartId = match.Id }; Send(() => net.RemoveFloatingPart(request)); }
                     done++;
                 }
             }
@@ -742,6 +774,8 @@ namespace BuildZoop.Zoop
             string what = Settings.ModeName(Settings.CurrentMode);
             if (Settings.CurrentMode == ZoopMode.Area && !Settings.FlatArea.Value)
                 what += " 3D";
+            if (Outbox.Count > 0)
+                what += ", envoi de " + Outbox.Count;
             KeyTips.Mode("Zoop " + what + " : " + Count + (Count > 1 ? " pièces" : " pièce")
                 + (_unaffordable > 0 ? " (matériaux manquants pour " + _unaffordable + ")" : string.Empty));
             KeyTips.Add(MouseBind.Left, removing ? "Retirer" : "Poser");
