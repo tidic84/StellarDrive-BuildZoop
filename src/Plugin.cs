@@ -3,7 +3,7 @@ using SDModKit;
 using SDModKit.Api;
 using SDModKit.Configuration;
 
-[assembly: MelonInfo(typeof(BuildZoop.Plugin), "StellarDrive Build Zoop", "1.3.0", "tidic84")]
+[assembly: MelonInfo(typeof(BuildZoop.Plugin), "StellarDrive Build Zoop", "1.4.0", "tidic84")]
 [assembly: MelonGame("CuriousOwlGames", "StellarDrive")]
 [assembly: HarmonyDontPatchAll]
 [assembly: StellarMod("buildzoop", "Build Zoop",
@@ -26,6 +26,11 @@ namespace BuildZoop
 #if DEV
             Dev.DevHarness.Init(LoggerInstance);
 #endif
+        }
+
+        public override void OnGUI()
+        {
+            Wheel.ModeWheel.OnGUI();
         }
 
 #if DEV

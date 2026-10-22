@@ -108,6 +108,13 @@ namespace BuildZoop.Dev
             _log.Msg($"[DEV] server place ship={P_0.ShipId} settings={P_0.SettingsId} at={P_0.Placement.Coord} conn={(P_1 == null ? "null" : P_1.ClientId.ToString())} player={(player == null ? "none" : player.Name + " free=" + player.IsUsingCheatFreeBuild + " items=" + player.HasItemsInInventory(Resources.FindObjectsOfTypeAll<PartSettings>().First(s => s.id == P_0.SettingsId).BuildingCost))}");
         }
 
+        private static IEnumerator ShotAfter(string path, float secs)
+        {
+            float end = Time.realtimeSinceStartup + secs;
+            while (Time.realtimeSinceStartup < end) yield return null;
+            ScreenCapture.CaptureScreenshot(path);
+        }
+
         private static float F(string s) => float.Parse(s, CultureInfo.InvariantCulture);
         private static int I(string s) => int.Parse(s, CultureInfo.InvariantCulture);
 
@@ -286,6 +293,19 @@ namespace BuildZoop.Dev
                     }
                     break;
                 }
+                case "wheel":
+                    // wheel down | up | point <x> <y> | free
+                    if (a[1] == "down") Wheel.ModeWheel.DevHeld = true;
+                    else if (a[1] == "up") Wheel.ModeWheel.DevHeld = false;
+                    else if (a[1] == "point") Wheel.ModeWheel.DevPointer = new Vector2(F(a[2]), F(a[3]));
+                    else Wheel.ModeWheel.DevPointer = null;
+                    _log.Msg($"[DEV] wheel open={Wheel.ModeWheel.IsOpen} mode={Settings.CurrentMode}");
+                    break;
+                case "shots":
+                    // shots <name> <delay>...: screenshots at those times from now
+                    for (int i = 2; i < a.Length; i++)
+                        MelonCoroutines.Start(ShotAfter(Path.Combine(MelonEnvironment.UserDataDirectory, $"bz_{a[1]}{i - 1}.png"), F(a[i])));
+                    break;
                 case "hold":
                     ZoopBuilder.DevHold = a[1] == "on";
                     break;

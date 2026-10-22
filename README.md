@@ -8,7 +8,7 @@ Satisfactory-style **zoop** for **StellarDrive (Demo)**, plus everything Build P
 
 Hold **Left Shift** with the build tool, aim, **left click**. The first part is the spot under the cursor when Shift goes down; the rest follows your aim, even into empty space, and grows from the first part so every panel touches the previous one.
 
-**V** cycles the mode:
+**Hold V** to open the mode wheel: move the mouse towards a mode and release (right click cancels; the camera does not turn while it is open). A short tap on V still goes to the next mode.
 
 | Mode | What it lays |
 | --- | --- |
@@ -17,6 +17,8 @@ Hold **Left Shift** with the build tool, aim, **left click**. The first part is 
 | **Diagonale** | A row in any of the 26 directions: **stairs** of floors, diagonal rows of walls, 3D diagonals. |
 | **Pyramide** | With a slope corner (lower or upper): one big flat triangle in the corners' sloped plane, lower and upper corners tiling it, one piece narrower on every row. Aim up to narrow it upwards (lower corners along the base), down to narrow it downwards (upper corners along the top). |
 | **Zone** (area) | A rectangle in the plane of the first part: floors, walls, **whole diagonal wall surfaces**, slope roofs. Turn off "Zone à plat" for the old 3D box. |
+| **Zone diagonale** | The same rectangle turned 45 degrees, from the first part (one corner) to the aim (the opposite one). |
+| **Zone diag. + bords** | For flat floors: the 45 degree area with its stepped edges filled with floor corners (flat triangles), so the edges are straight. Other parts behave like Zone diagonale. |
 
 - Slope corners zoop like slopes: rows along the axes, and up their ramps.
 - Spots already taken and parts you cannot pay for show in **red** and are skipped (the server does not check either, so nothing gets overwritten). The key tip shows how many parts will be placed and how many lack materials.

@@ -46,7 +46,13 @@ namespace BuildZoop
             PlacementLock.Apply(harmony, Log);
             Pick.Apply(harmony, Log);
             Pairing.SharedVoxel.Apply(harmony, Log);
+            Wheel.ModeWheel.Apply(harmony);
             AddPage("Build", DrawPage).Available = () => GameRefs.InWorld;
+        }
+
+        public override void OnWorldEnter()
+        {
+            Wheel.ModeIcons.Warm();
         }
 
         public override void OnWorldExit()
@@ -61,6 +67,7 @@ namespace BuildZoop
             if (ModKit.Menu != null && ModKit.Menu.IsOpen)
             {
                 ZoopBuilder.Cancel();
+                Wheel.ModeWheel.Close(-1);
                 return;
             }
             if (!GameRefs.InWorld)
@@ -160,7 +167,7 @@ namespace BuildZoop
                 foreach (ZoopMode mode in Settings.ModeOrder)
                 {
                     bool on = Settings.CurrentMode == mode;
-                    if (ModUi.Button((on ? "> " : string.Empty) + Settings.ModeName(mode), 100f))
+                    if (ModUi.Button((on ? "> " : string.Empty) + Settings.ModeName(mode), 0f))
                         Settings.CurrentMode = mode;
                 }
             });

@@ -124,14 +124,12 @@ namespace BuildZoop.Zoop
             {
                 Cancel();
                 _toggled = false;
+                Wheel.ModeWheel.Close(-1);
                 return;
             }
 
-            if (Settings.ModeKey != null && Settings.ModeKey.Pressed && !LocalPlayer.GameMenuOpen)
-            {
-                Settings.NextMode();
+            if (Wheel.ModeWheel.Update())
                 _dir = Vector3Int.zero;
-            }
             if (Settings.UndoKey != null && Settings.UndoKey.Pressed && !LocalPlayer.GameMenuOpen)
                 Undo();
 
@@ -358,6 +356,10 @@ namespace BuildZoop.Zoop
                         case ZoopMode.Line:
                             FollowLine(origin, ray, _floating ? ZoopGeometry.HorizontalDirections(_u, _v, _w) : _lineDirections);
                             break;
+                        case ZoopMode.DiagonalArea:
+                        case ZoopMode.DiagonalAreaEdges:
+                            FollowPlane(origin, ray);
+                            break;
                         case ZoopMode.Pyramid when !_floating && Pyramid.TryFamily(_settings, out _):
                             FollowPyramid(origin, ray);
                             break;
@@ -571,6 +573,12 @@ namespace BuildZoop.Zoop
                 foreach (var unused in candidates)
                     optional.Add(false);
             }
+            else if (Settings.CurrentMode == ZoopMode.DiagonalArea || Settings.CurrentMode == ZoopMode.DiagonalAreaEdges)
+            {
+                BuildDiagonalArea(candidates, candidateSettings);
+                foreach (var unused in candidates)
+                    optional.Add(false);
+            }
             else
             {
                 foreach (var offset in Offsets)
@@ -617,6 +625,27 @@ namespace BuildZoop.Zoop
                 HullPlanSettings.Add(settings);
                 Valid.Add(ok);
             }
+        }
+
+        private static void BuildDiagonalArea(List<HullPartPlacement> placements, List<PartSettings> settings)
+        {
+            int limit = Mathf.Max(1, Settings.Limit.Value);
+            var anchor = _anchorHull;
+            anchor.Position = new HullPartPosition(anchor.Coord, anchor.Position.Type == Pairing.SharedVoxel.Second ? VoxelPartType.Interior : anchor.Position.Type);
+            if (anchor.Position.Type == VoxelPartType.Floor && DiagonalArea.TryFloors(_settings, out var flat, out var corner))
+            {
+                // Floors: diagonals of the ship's x and z, full floors inside, floor corners on the edges if asked.
+                if (flat != _settings)
+                {
+                    anchor.ForwardOrientation = PartOrientation.Up;
+                    anchor.UpOrientation = PartOrientation.Forward;
+                }
+                Vector3Int t = _u * _areaI + _v * _areaJ;
+                DiagonalArea.Build(anchor, Vector3Int.right, new Vector3Int(0, 0, 1), t.x, t.z, flat,
+                    Settings.CurrentMode == ZoopMode.DiagonalAreaEdges ? corner : null, limit, placements, settings);
+                return;
+            }
+            DiagonalArea.Build(anchor, Vector3Int.Scale(_u, _hullStep), Vector3Int.Scale(_v, _hullStep), _areaI, _areaJ, _settings, null, limit, placements, settings);
         }
 
         private static void EvaluateFloating(IShipStateRead ship)
@@ -846,7 +875,7 @@ namespace BuildZoop.Zoop
             if (Settings.ZoopEnabled.Value)
             {
                 KeyTips.Add(Settings.ZoopKey, "Zoop (" + Settings.ModeName(Settings.CurrentMode) + ")");
-                KeyTips.Add(Settings.ModeKey, "Mode");
+                KeyTips.Add(Settings.ModeKey, "Mode (maintenir : roue)");
             }
             if (CanUndo)
                 KeyTips.Add(Settings.UndoKey, "Annuler");
