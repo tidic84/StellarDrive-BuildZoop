@@ -160,7 +160,7 @@ namespace BuildZoop.Dev
                             {
                                 var voxel = ship.GetVoxel(new Vector3Int(x, y, z));
                                 if (voxel == null) continue;
-                                foreach (VoxelPartType t in Enum.GetValues(typeof(VoxelPartType)))
+                                foreach (VoxelPartType t in new[] { VoxelPartType.Floor, VoxelPartType.ForwardWall, VoxelPartType.RightWall, VoxelPartType.Interior, Pairing.SharedVoxel.Second })
                                 {
                                     var p = voxel.GetPartFromType(t);
                                     if (!p.HasValue || p.Value.Settings == null) continue;
@@ -205,6 +205,104 @@ namespace BuildZoop.Dev
                 case "freebuild":
                     PlayerAccess.LocalNetworkState.ServerSetUsingCheatFreeBuild(a.Length < 2 || a[1] != "off");
                     _log.Msg($"[DEV] free build {PlayerAccess.LocalNetworkState.IsUsingCheatFreeBuild}");
+                    break;
+                case "snap":
+                {
+                    // snap <shipId> <settingsId> <forward> <ax> <ay> <az> [place]: the game's own snapping, camera aimed at a ship-local point
+                    uint shipId = uint.Parse(a[1]);
+                    var settings = Resources.FindObjectsOfTypeAll<PartSettings>().First(x => x.id == ushort.Parse(a[2]));
+                    var fwd = (PartOrientation)Enum.Parse(typeof(PartOrientation), a[3]);
+                    var tracked = Ships.Ships.First(x => x.Id == shipId);
+                    Transform rb = tracked.ShipRigidBody.transform;
+                    Vector3 target = rb.TransformPoint(new Vector3(F(a[4]), F(a[5]), F(a[6])));
+                    Camera cam = GameRefs.PlayerCamera;
+                    var detection = Core.Services.ServiceLocator.GetService<Tools.Build.PartPreviewDetection>();
+                    var result = detection.CalculateSnapDetectionUpdate(new Tools.Build.Model.SnapDetectionState
+                    {
+                        partSettings = settings,
+                        partRotation = rb.rotation * Quaternion.LookRotation(fwd.GetVector3(), Mathf.Abs(fwd.GetVector3().normalized.y) > 0.9f ? Vector3.forward : Vector3.up)
+                    }, new Core.Utils.CameraPhysicsData { CameraPos = cam.transform.position, Direction = (target - cam.transform.position).normalized });
+                    _log.Msg($"[DEV] snap snapped={result.IsSnapped} placement={result.placement} cam={rb.InverseTransformPoint(cam.transform.position)}");
+                    if (a.Length > 7 && a[7] == "place" && result.IsSnapped && result.placement is HullPartPlacement hp)
+                    {
+                        ushort id = settings.id;
+                        if (settings is HullPartSettings hs && hs.pivotedSettings != null && (hp.ForwardOrientation == PartOrientation.ForwardRight || hp.ForwardOrientation == PartOrientation.ForwardLeft))
+                            id = hs.pivotedSettings.id;
+                        GameRefs.Service<IShipInteractionNetworkService>().PlaceHullPart(new PlaceHullPartNetworkRequest { ShipId = shipId, SettingsId = id, Placement = hp });
+                        _log.Msg($"[DEV] placed {id} at {hp.Position}");
+                    }
+                    break;
+                }
+                case "hover":
+                {
+                    // hover <shipId> <ax> <ay> <az>: what the recycler would target looking at that ship-local point
+                    var tracked = Ships.Ships.First(x => x.Id == uint.Parse(a[1]));
+                    Vector3 target = tracked.ShipRigidBody.transform.TransformPoint(new Vector3(F(a[2]), F(a[3]), F(a[4])));
+                    Camera cam = GameRefs.PlayerCamera;
+                    Vector3 dir = (target - cam.transform.position).normalized;
+                    if (!ClientScene.PhysicsScene.Raycast(cam.transform.position, dir, out RaycastHit hit, 10f, Tools.Common.RaycastMasks.BuildDetectionLayer))
+                    {
+                        _log.Msg("[DEV] hover: nothing");
+                        break;
+                    }
+                    var hover = new Tools.Common.Hover.HullHover(hit, dir);
+                    _log.Msg($"[DEV] hover tag={hit.collider.tag} position={HarmonyLib.Traverse.Create(hover).Field("_hullPartPosition").GetValue()}");
+                    break;
+                }
+                case "serverhull":
+                {
+                    var server = GameRefs.Service<ShipsServerTracker>().GetShip(uint.Parse(a[1]));
+                    var parts = HarmonyLib.Traverse.Create(server).Property("State").GetValue<Ships.Interface.Model.ShipState>().GetHullParts();
+                    _log.Msg($"[DEV] server hull {parts.Count}: " + string.Join(" ", parts.Keys.Select(k => k.VoxelCoord + ":" + (int)k.Type)));
+                    var client = Aim.Ship(uint.Parse(a[1]));
+                    _log.Msg($"[DEV] client state {HarmonyLib.Traverse.Create(client).Property("State").GetValue<Ships.Interface.Model.ShipState>()?.GetHullParts().Count}");
+                    break;
+                }
+                case "equip":
+                    // equip <partId>: build tool out with that part selected
+                    LocalPlayer.TryEquip(LocalPlayer.BuildToolItem);
+                    GameRefs.Service<Players.Interface.Services.ILocalSelectedPartProvider>().SelectPart(ushort.Parse(a[1]));
+                    _log.Msg($"[DEV] build active={ToolRefs.BuildActive}");
+                    break;
+                case "key":
+                {
+                    // key <Key> down|up: fakes the keyboard state (only that key held)
+                    UnityEngine.InputSystem.InputSystem.settings.backgroundBehavior = UnityEngine.InputSystem.InputSettings.BackgroundBehavior.IgnoreFocus;
+                    var kb = UnityEngine.InputSystem.Keyboard.current;
+                    var keyState = a[2] == "down"
+                        ? new UnityEngine.InputSystem.LowLevel.KeyboardState((UnityEngine.InputSystem.Key)Enum.Parse(typeof(UnityEngine.InputSystem.Key), a[1]))
+                        : new UnityEngine.InputSystem.LowLevel.KeyboardState();
+                    UnityEngine.InputSystem.InputSystem.QueueStateEvent(kb, keyState);
+                    break;
+                }
+                case "givecost":
+                {
+                    // givecost <partId> <times>: the materials to build that part that many times
+                    var settings = Resources.FindObjectsOfTypeAll<PartSettings>().First(x => x.id == ushort.Parse(a[1]));
+                    foreach (var item in settings.BuildingCost)
+                    {
+                        PlayerAccess.TryGive(item.ItemId, item.Quantity * int.Parse(a[2]), out string error);
+                        _log.Msg($"[DEV] give {item.ItemId} x{item.Quantity * int.Parse(a[2])} {error}");
+                    }
+                    break;
+                }
+                case "hold":
+                    ZoopBuilder.DevHold = a[1] == "on";
+                    break;
+                case "click":
+                    ToolRefs.Build.PrimaryActionBegin();
+                    ToolRefs.Build.PrimaryActionEnd();
+                    break;
+                case "state":
+                {
+                    var obj = Aim.PreviewObject(ToolRefs.Build);
+                    int on = obj == null ? -1 : obj.GetComponentsInChildren<Renderer>().Count(r => r.enabled);
+                    _log.Msg($"[DEV] zoop active={ZoopBuilder.Active} count={ZoopBuilder.Count} shift={UnityEngine.InputSystem.Keyboard.current.leftShiftKey.isPressed} previewRenderersOn={on} status={ZoopBuilder.Status}");
+                    break;
+                }
+                case "save":
+                    UnityEngine.Object.FindFirstObjectByType<Saving.Services.GameSaver>().SaveGame(new Saving.Interface.Model.SaveGameParams { IsAutomatic = false });
+                    _log.Msg("[DEV] saving");
                     break;
                 case "undo":
                     ZoopBuilder.Undo();

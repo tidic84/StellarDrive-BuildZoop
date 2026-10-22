@@ -31,6 +31,13 @@ namespace BuildZoop.Zoop
             return PreviewField.GetValue(build) as PartPreview;
         }
 
+        /// <summary>The build tool's preview object (the hologram in the middle of the screen), or null.</summary>
+        public static GameObject PreviewObject(BuildToolLocalClient build)
+        {
+            var preview = Preview(build);
+            return preview == null || ObjectPreviewField == null ? null : ObjectPreviewField.GetValue(preview) as GameObject;
+        }
+
         /// <summary>The snapped placement the build tool would make now, or null.</summary>
         public static SnappedPreviewPlacement Snapped(BuildToolLocalClient build)
         {

@@ -4,6 +4,7 @@ using Managers.Interface.Services;
 using SDModKit.Game;
 using SDModKit.Input;
 using SDModKit.UI;
+using Ships.Interface.Model;
 using Ships.Interface.Model.Parts;
 using Ships.Interface.Model.Placement;
 using Ships.Interface.Model.State;
@@ -135,6 +136,9 @@ namespace BuildZoop.Zoop
                 _toggled = !_toggled;
             bool wanted = Settings.ZoopEnabled.Value && Settings.ZoopKey != null
                 && (Settings.HoldToZoop.Value ? Settings.ZoopKey.Held : _toggled);
+#if DEV
+            wanted |= DevHold;
+#endif
 
             if (!wanted)
             {
@@ -148,12 +152,42 @@ namespace BuildZoop.Zoop
             if (!_active)
                 Begin(ToolRefs.Build, ToolRefs.Recycler, buildActive);
             if (_active)
+            {
                 Track(ToolRefs.Build, ToolRefs.Recycler, buildActive);
+                if (buildActive)
+                    HidePreview(ToolRefs.Build);
+            }
             ActiveTips(recyclerActive && !buildActive);
+        }
+
+        // Renderers of the build tool's own preview, hidden while the zoop ghosts show the parts.
+        private static readonly List<Renderer> HiddenPreview = new List<Renderer>();
+
+        private static void HidePreview(BuildToolLocalClient build)
+        {
+            var obj = Aim.PreviewObject(build);
+            if (obj == null)
+                return;
+            foreach (var r in obj.GetComponentsInChildren<Renderer>())
+            {
+                if (!r.enabled)
+                    continue;
+                r.enabled = false;
+                HiddenPreview.Add(r);
+            }
+        }
+
+        private static void ShowPreview()
+        {
+            foreach (var r in HiddenPreview)
+                if (r != null)
+                    r.enabled = true;
+            HiddenPreview.Clear();
         }
 
         public static void Cancel()
         {
+            ShowPreview();
             _active = false;
             _floating = false;
             Offsets.Clear();
@@ -493,6 +527,8 @@ namespace BuildZoop.Zoop
         private static void EvaluateHull(IShipPartPlacements grid, IShipStateRead ship)
         {
             var type = _anchorHull.Position.Type;
+            if (type == Pairing.SharedVoxel.Second)
+                type = VoxelPartType.Interior;
             var seen = new HashSet<Vector3Int>();
             foreach (var offset in Offsets)
             {
@@ -509,10 +545,18 @@ namespace BuildZoop.Zoop
                 }
 
                 bool ok = true;
-                foreach (var c in placement.CalculateAllCoords(_settings.size))
+                if (type == VoxelPartType.Interior || type == Pairing.SharedVoxel.Second)
                 {
-                    if (!seen.Add(c) || !grid.IsHullPartAvailable(c, type))
-                        ok = false;
+                    // Interior parts may share a voxel with the other half of a wall + slope corner pair.
+                    ok = seen.Add(coord) && Pairing.SharedVoxel.Resolve(ship, _settings, ref placement);
+                }
+                else
+                {
+                    foreach (var c in placement.CalculateAllCoords(_settings.size))
+                    {
+                        if (!seen.Add(c) || !grid.IsHullPartAvailable(c, type))
+                            ok = false;
+                    }
                 }
                 HullPlan.Add(placement);
                 Valid.Add(ok);
@@ -705,6 +749,7 @@ namespace BuildZoop.Zoop
 
 #if DEV
         internal static Vector3? DevAim;
+        internal static bool DevHold;
 
         internal static void DevStart(uint shipId, PartSettings settings, HullPartPlacement anchor)
         {

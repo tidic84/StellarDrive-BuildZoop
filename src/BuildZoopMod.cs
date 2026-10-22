@@ -45,6 +45,7 @@ namespace BuildZoop
             ApplyPatches(harmony);
             PlacementLock.Apply(harmony, Log);
             Pick.Apply(harmony, Log);
+            Pairing.SharedVoxel.Apply(harmony, Log);
             AddPage("Build", DrawPage).Available = () => GameRefs.InWorld;
         }
 

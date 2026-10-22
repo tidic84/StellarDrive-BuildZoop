@@ -20,7 +20,15 @@ Hold **Left Shift** with the build tool, aim, **left click**. The first part is 
 - Spots already taken and parts you cannot pay for show in **red** and are skipped (the server does not check either, so nothing gets overwritten). The key tip shows how many parts will be placed and how many lack materials.
 - Works with floating parts (step = part size) and with the **recycler** to remove a line, diagonal or area of panels (or a box of floating parts).
 - **Backspace** undoes the last zoop (removes what it placed, or puts back what it removed). Up to 30 steps.
+- While zooping, the build tool's own preview is hidden: the zoop ghosts show what will be placed.
 - Options in the mod menu: hold or toggle the key, flat or 3D areas, max parts per zoop (2000 by default, up to 10000). Big zoops are sent over a few seconds (120 parts per frame) so the server keeps up; the key tip shows what is left to send.
+
+## Slope corners next to diagonal walls
+
+The game keeps a pivoted wall and a slope corner (lower or upper) in the same single "interior" slot of a voxel, so it refuses a slope corner next to a diagonal wall although it takes one next to a straight wall. Build Zoop adds a second interior slot used only for that pair (a pivoted wall plus a slope corner whose sloped side runs along it; they only touch along an edge). Snapping, zoop, recycler, paint and pick all work on both parts.
+
+- These corners are saved in `buildzoop-hull.txt` next to `world.json`, not in `world.json` itself: without the mod the world still loads, those corners are just missing.
+- In multiplayer every player needs the mod.
 
 ## From Build Plus
 
