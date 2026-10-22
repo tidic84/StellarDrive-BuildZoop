@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <AssemblyName>BuildZoop</AssemblyName>
+    <RootNamespace>BuildZoop</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <Version>1.0.0</Version>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <DebugType>none</DebugType>
+    <NoWarn>CS0436;CS1701;CS1702</NoWarn>
+
+    <!-- Override on the command line: dotnet build -p:GamePath=".../StellarDrive Demo" -->
+    <GamePath Condition="'$(GamePath)' == '' and Exists('/mnt/c')">/mnt/c/Program Files (x86)/Steam/steamapps/common/StellarDrive Demo</GamePath>
+    <GamePath Condition="'$(GamePath)' == ''">C:\Program Files (x86)\Steam\steamapps\common\StellarDrive Demo</GamePath>
+    <ManagedPath>$(GamePath)/StellarDrive_Data/Managed</ManagedPath>
+    <MelonLoaderPath Condition="'$(MelonLoaderPath)' == ''">$(GamePath)/MelonLoader/net35</MelonLoaderPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="MelonLoader"><HintPath>$(MelonLoaderPath)/MelonLoader.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="0Harmony"><HintPath>$(MelonLoaderPath)/0Harmony.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="SDModKit"><HintPath>$(GamePath)/Mods/SDModKit.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+
+  <!-- Every game and Unity assembly, except the BCL ones netstandard already provides. -->
+  <ItemGroup>
+    <GameAssembly Include="$(ManagedPath)/*.dll" Exclude="$(ManagedPath)/mscorlib.dll;$(ManagedPath)/netstandard.dll;$(ManagedPath)/System*.dll;$(ManagedPath)/Mono.*.dll;$(ManagedPath)/Microsoft.*.dll" />
+    <Reference Include="@(GameAssembly)" Private="false" />
+  </ItemGroup>
+
+</Project>

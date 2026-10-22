@@ -1,0 +1,8 @@
+{
+    "id": "buildzoop",
+    "name": "Build Zoop",
+    "author": "tidic84",
+    "version": "1.0.0",
+    "description": "Satisfactory-style zoop for the build tool and the recycler: lines, diagonals and areas that follow your aim into empty space, with undo. Diagonal walls line up into diagonal walls (and whole diagonal wall surfaces), slopes into ramps, floors into stairs. Occupied spots and parts you cannot pay for show in red and are skipped. Also middle click pick (with rotation and settings), placement lock with nudging, rotation lock and circuit copy. Replaces Build Plus (remove it). Needs SDModKit.",
+    "thumbnail": "Thumbnail.png"
+}
