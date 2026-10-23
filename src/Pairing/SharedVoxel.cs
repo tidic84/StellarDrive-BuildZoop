@@ -15,7 +15,10 @@ using Ships.Interface.Model.Placement;
 using Ships.Interface.Model.State;
 using Ships.Interface.Services;
 using Ships.Interface.Settings;
+using Core.Utils;
 using Tools.Build.Model;
+using BuildZoop.Zoop;
+using WorldTracking.Interface.Values;
 using Tools.Common.Hover;
 using UnityEngine;
 
@@ -113,26 +116,73 @@ namespace BuildZoop.Pairing
             return part.HullSettings != null && part.HullSettings.hullMeshSegmentType == HullMeshSegmentType.SlopeCorner;
         }
 
-        /// <summary>A pivoted wall and a slope corner whose sloped side runs along the wall (the game's own rule for a corner on top of a wall).</summary>
+        /// <summary>
+        /// Every interior part is one flat panel cutting its voxel: a pivoted wall or a slope through the voxel's
+        /// centre, a slope corner across one corner of it. The panel is the voxel cut by the plane n.x = c, n being
+        /// the part's forward (+-1 per axis) and c 0, or -1/2 for slope corners (lower ones sit in a bottom corner,
+        /// upper ones, facing down, in a top corner).
+        /// </summary>
+        private static void Panel(PartSettings settings, HullPartPlacement placement, out Vector3 n, out float c)
+        {
+            n = ZoopGeometry.Sign(placement.ForwardOrientation.GetVector3());
+            c = IsSlopeCorner(settings) ? -0.5f : 0f;
+        }
+
+        private static void Panel(HullPart part, out Vector3 n, out float c)
+        {
+            n = ZoopGeometry.Sign(part.ForwardOrientation.GetVector3());
+            c = IsSlopeCorner(part) ? -0.5f : 0f;
+        }
+
+        /// <summary>
+        /// Two panels can share a voxel when they do not cross inside it: parallel planes (a lower and an upper
+        /// slope corner), or planes meeting only on the voxel's surface (a slope corner along a pivoted wall, under a
+        /// slope or above it).
+        /// </summary>
         private static bool Fits(PartSettings settings, HullPartPlacement placement, HullPart other)
         {
-            bool wall = IsPivotedWall(placement.ForwardOrientation) && !IsSlopeCorner(settings);
-            bool corner = IsSlopeCorner(settings);
-            bool otherWall = IsPivotedWall(other.ForwardOrientation) && !IsSlopeCorner(other);
-            bool otherCorner = IsSlopeCorner(other);
-            if (!(wall && otherCorner) && !(corner && otherWall))
+            if (other.HullSettings == null)
                 return false;
-            float dot = Vector3.Dot(placement.ForwardOrientation.GetVector3().normalized, other.ForwardOrientation.GetVector3().normalized);
-            return Mathf.Abs(dot) >= 0.5f;
+            Panel(settings, placement, out var na, out float ca);
+            Panel(other, out var nb, out float cb);
+            return !Cross(na, ca, nb, cb);
+        }
+
+        private static bool Cross(Vector3 na, float ca, Vector3 nb, float cb)
+        {
+            const float inside = 0.5f - 1e-3f;
+            Vector3 d = Vector3.Cross(na, nb);
+            float dd = d.sqrMagnitude;
+            if (dd < 1e-6f)
+            {
+                // Parallel: they only clash if they are the same plane.
+                float k = Vector3.Dot(na, nb) / nb.sqrMagnitude;
+                return Mathf.Abs(ca - k * cb) < 1e-4f;
+            }
+            // A point on both planes, then the part of their common line inside the voxel.
+            float ab = Vector3.Dot(na, nb);
+            Vector3 p0 = ((ca * nb.sqrMagnitude - cb * ab) * na + (cb * na.sqrMagnitude - ca * ab) * nb) / dd;
+            float tMin = float.NegativeInfinity, tMax = float.PositiveInfinity;
+            for (int i = 0; i < 3; i++)
+            {
+                if (Mathf.Abs(d[i]) < 1e-6f)
+                {
+                    if (Mathf.Abs(p0[i]) >= inside)
+                        return false;
+                    continue;
+                }
+                float t1 = (-inside - p0[i]) / d[i], t2 = (inside - p0[i]) / d[i];
+                tMin = Mathf.Max(tMin, Mathf.Min(t1, t2));
+                tMax = Mathf.Min(tMax, Mathf.Max(t1, t2));
+            }
+            return tMax - tMin > 1e-4f;
         }
 
         private static bool Pairable(PartSettings settings)
         {
             if (settings == null)
                 return false;
-            if (IsSlopeCorner(settings))
-                return true;
-            return settings.snappingStyle == SnappingStyle.WallPivotable;
+            return IsSlopeCorner(settings) || settings.snappingStyle == SnappingStyle.SlopedWall || settings.snappingStyle == SnappingStyle.WallPivotable;
         }
 
         /// <summary>
@@ -224,25 +274,28 @@ namespace BuildZoop.Pairing
         {
             if (__result || _previewing == null || hullPartPosition.Type != VoxelPartType.Interior)
                 return;
-            // Let the game's snap detectors offer the spot; AfterSnap checks the pair really fits.
+            // Let the game's snap detectors offer a voxel whose second slot is free; AfterSnap checks the pair fits.
             var voxel = __instance.GetVoxel(hullPartPosition.VoxelCoord);
-            var first = voxel?.InteriorPart;
-            if (first.HasValue && !Get(voxel).HasValue && (IsSlopeCorner(_previewing) ? !IsSlopeCorner(first.Value) : IsSlopeCorner(first.Value)))
+            if (voxel != null && voxel.InteriorPart.HasValue && !Get(voxel).HasValue)
                 __result = true;
         }
 
-        public static void AfterSnap(SnapDetectionState state, ref SnapDetectionResults __result)
+        public static void AfterSnap(SnapDetectionState state, CameraPhysicsData cameraPhysics, ref SnapDetectionResults __result)
         {
             var settings = _previewing;
             _previewing = null;
-            if (settings == null || !__result.IsSnapped || !(__result.placement is HullPartPlacement placement) || __result.shipPartsProxy == null)
+            if (settings == null)
+                return;
+            // Aiming at a pivoted wall, a slope or a slope corner: the new part goes into that same voxel, on the
+            // side the camera looks from, when it fits there.
+            if (TrySameVoxel(state, cameraPhysics, settings, ref __result))
+                return;
+            if (!__result.IsSnapped || !(__result.placement is HullPartPlacement placement) || __result.shipPartsProxy == null)
                 return;
             if (placement.Position.Type != VoxelPartType.Interior)
                 return;
             var ship = Zoop.Aim.Ship(__result.shipPartsProxy.ShipId);
-            // The preview shows the pivoted version of a wall once it snaps diagonally.
-            var real = settings is HullPartSettings hull && hull.pivotedSettings != null && IsPivotedWall(placement.ForwardOrientation) ? hull.pivotedSettings : settings;
-            if (Resolve(ship, real, ref placement))
+            if (Resolve(ship, Real(settings, placement), ref placement))
             {
                 __result.placement = placement;
                 return;
@@ -250,6 +303,77 @@ namespace BuildZoop.Pairing
             __result.IsSnapped = false;
             __result.placement = null;
             __result.shipPartsProxy = null;
+        }
+
+        /// <summary>The preview shows the pivoted version of a wall once it snaps diagonally.</summary>
+        private static PartSettings Real(PartSettings settings, HullPartPlacement placement)
+        {
+            return settings is HullPartSettings hull && hull.pivotedSettings != null && IsPivotedWall(placement.ForwardOrientation) ? hull.pivotedSettings : settings;
+        }
+
+        private static bool TrySameVoxel(SnapDetectionState state, CameraPhysicsData cam, PartSettings settings, ref SnapDetectionResults result)
+        {
+            // Only parts whose orientation the preview alone gives: slope corners and slopes.
+            bool corner = IsSlopeCorner(settings), slope = settings.snappingStyle == SnappingStyle.SlopedWall;
+            if (!corner && !slope)
+                return false;
+            if (!ClientScene.PhysicsScene.Raycast(cam.CameraPos, cam.Direction, out RaycastHit hit, 5f, Tools.Common.RaycastMasks.BuildDetectionLayer))
+                return false;
+            if (hit.collider == null || !ShipPartsTagDetection.ColliderIsHull(hit.collider) || ShipPartsTagDetection.GetPartType(hit.collider) != VoxelPartType.Interior)
+                return false;
+            var proxy = hit.collider.GetComponentInParent<IShipPartPlacements>();
+            if (proxy == null || HoverPosition == null)
+                return false;
+            HullHover hover;
+            try
+            {
+                hover = new HullHover(hit, cam.Direction);
+            }
+            catch
+            {
+                return false;
+            }
+            var aimed = (HullPartPosition)HoverPosition.GetValue(hover);
+            var ship = Zoop.Aim.Ship(proxy.ShipId);
+            var existing = Zoop.Aim.HullPartAt(ship, aimed);
+            if (!existing.HasValue || existing.Value.HullSettings == null)
+                return false;
+
+            Vector3 forward = proxy.ToLocalRotation(state.partRotation) * Vector3.forward;
+            PartOrientation? f = corner ? PartOrientationHelper.SnapSlopeCornerOrientation(forward) : PartOrientationHelper.SnapSlopeOrientation(forward);
+            if (!f.HasValue)
+                return false;
+            PartOrientation up = corner ? PartOrientationHelper.GetSlopeCornerUp(f.Value) : SlopeUp(f.Value);
+            var placement = new HullPartPlacement(aimed.VoxelCoord, VoxelPartType.Interior, f.Value, up);
+            if (!Resolve(ship, settings, ref placement))
+                return false;
+
+            // Same side of the aimed panel as the camera (a slope's own panel goes through the centre: no side).
+            Panel(existing.Value, out var n, out float c);
+            Vector3 eye = proxy.ToLocalPos(cam.CameraPos) - (Vector3)aimed.VoxelCoord;
+            Panel(settings, placement, out var nNew, out float cNew);
+            Vector3 middle = cNew == 0f ? Vector3.zero : nNew * (cNew / 3f);
+            float sideEye = Vector3.Dot(n, eye) - c, sideNew = Vector3.Dot(n, middle) - c;
+            if (Mathf.Abs(sideNew) > 1e-3f && Mathf.Sign(sideEye) != Mathf.Sign(sideNew))
+                return false;
+
+            result.IsSnapped = true;
+            result.pivot = null;
+            result.placement = placement;
+            result.shipPartsProxy = proxy;
+            result.pos = proxy.ToWorldPos(placement);
+            return true;
+        }
+
+        private static PartOrientation SlopeUp(PartOrientation forward)
+        {
+            switch (forward)
+            {
+                case PartOrientation.ForwardUp: return PartOrientation.BackUp;
+                case PartOrientation.BackUp: return PartOrientation.ForwardUp;
+                case PartOrientation.RightUp: return PartOrientation.LeftUp;
+                default: return PartOrientation.RightUp;
+            }
         }
 
         /// <summary>Points the hover at the second slot when the collider under the cursor is that part's.</summary>

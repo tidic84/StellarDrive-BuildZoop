@@ -27,11 +27,17 @@ Hold **Left Shift** with the build tool, aim, **left click**. The first part is 
 - While zooping, the build tool's own preview is hidden: the zoop ghosts show what will be placed.
 - Options in the mod menu: hold or toggle the key, flat or 3D areas, max parts per zoop (2000 by default, up to 10000). Big zoops are sent over a few seconds (120 parts per frame) so the server keeps up; the key tip shows what is left to send.
 
-## Slope corners next to diagonal walls
+## Two panels in one voxel
 
-The game keeps a pivoted wall and a slope corner (lower or upper) in the same single "interior" slot of a voxel, so it refuses a slope corner next to a diagonal wall although it takes one next to a straight wall. Build Zoop adds a second interior slot used only for that pair (a pivoted wall plus a slope corner whose sloped side runs along it; they only touch along an edge). Snapping, zoop, recycler, paint and pick all work on both parts.
+Pivoted walls, slopes and slope corners all live in the single "interior" slot of a voxel, so the game refuses a slope corner next to a diagonal wall (although it takes one next to a straight wall), under a slope, or above another corner. Each of these parts is one flat panel cutting its voxel, and two panels can share it as long as they do not cross inside it. Build Zoop adds a second interior slot for such pairs:
 
-- These corners are saved in `buildzoop-hull.txt` next to `world.json`, not in `world.json` itself: without the mod the world still loads, those corners are just missing.
+- a slope corner along a diagonal wall, on either side;
+- a lower slope corner under a slope, an upper one above it;
+- an upper slope corner above a lower one.
+
+Aiming at a diagonal wall, a slope or a slope corner with a slope corner (or a slope) in hand snaps the new part into that same voxel, on the side you look from, when it fits there; aiming at the floor next to a diagonal wall does too. Zoop, recycler, paint and pick all work on both parts.
+
+- These second parts are saved in `buildzoop-hull.txt` next to `world.json`, not in `world.json` itself: without the mod the world still loads, those parts are just missing.
 - In multiplayer every player needs the mod.
 
 ## From Build Plus
