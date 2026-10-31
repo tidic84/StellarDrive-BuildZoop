@@ -12,6 +12,8 @@ dotnet build src/BuildZoop.csproj -c Release -nologo -v q "$@"
 rm -rf dist/stage && mkdir -p dist/stage/Mods
 cp src/bin/Release/BuildZoop.dll dist/stage/Mods/
 cp Mods/mod.json Mods/Thumbnail.png dist/stage/
+cp -R Mods/images dist/stage/images
+cp LICENSE dist/stage/LICENSE
 rm -f dist/StellarDrive-BuildZoop.zip
 (cd dist/stage && python3 -c "import zipfile,os
 z=zipfile.ZipFile('../StellarDrive-BuildZoop.zip','w',zipfile.ZIP_DEFLATED)
