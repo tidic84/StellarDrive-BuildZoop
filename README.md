@@ -89,7 +89,7 @@ Pivoted walls, slopes and slope corners all live in the single "interior" slot o
 - a lower slope corner under a slope, an upper one above it;
 - an upper slope corner above a lower one.
 
-Aiming at a diagonal wall, a slope or a slope corner with a slope corner (or a slope) in hand snaps the new part into that same voxel, on the side you look from, when it fits there; aiming at the floor next to a diagonal wall does too. Zoop, recycler, paint and pick all work on both parts.
+Placement targeting uses the game's original snapping. Build Zoop does not redirect the preview into occupied voxels or change which positions the native snap detectors consider available. Zoop can still place compatible panels into the second slot, and existing second-slot parts remain supported by loading, saving, recycling, painting and pick.
 
 - These second parts are saved in `buildzoop-hull.txt` next to `world.json`, not in `world.json` itself: without the mod the world still loads, those parts are just missing.
 - In multiplayer every player needs the mod.
