@@ -2,17 +2,17 @@
     "id": "buildzoop",
     "name": "Build Zoop",
     "author": "tidic84",
-    "version": "1.5.0",
+    "version": "1.6.0",
     "description": "Satisfactory-style building for StellarDrive Demo. Hold V to choose horizontal or vertical lines, diagonals, rectangular areas, 45-degree areas with straight triangle edges, or slope-corner triangles. Preview up to 10,000 parts and place them with one zoop; occupied spots and missing materials are highlighted and skipped. Supports slopes, diagonal walls, recycling and undo, plus middle-click pick, placement nudging, rotation lock and circuit copy. Compatible interior panels can share a voxel. Requires SDModKit. Replaces Build Plus.",
     "thumbnail": "Thumbnail.png",
     "images": [
-        "images/01-roue-selection.png",
         "images/02-zone-apercu.png",
         "images/03-zone-resultat.png",
         "images/04-diagonale-bords-apercu.png",
         "images/05-diagonale-bords-resultat.png",
         "images/06-slopes-zone-apercu.png",
-        "images/07-slopes-zone-resultat.png"
+        "images/07-slopes-zone-resultat.png",
+        "images/01-roue-selection.png"
     ],
     "needs": [
         "sdmodkit"

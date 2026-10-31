@@ -4,12 +4,6 @@ Satisfactory-style **zoop** for **StellarDrive (Demo)**, plus everything Build P
 
 ## Screenshot gallery
 
-### Selection wheel (hold V)
-
-Hold **V**, point at a mode, then release to select it. A short tap cycles to the next mode.
-
-![Build Zoop selection wheel with seven building modes](Mods/images/01-roue-selection.png)
-
 ### Area — preview
 
 The blue hologram previews a 7 × 6 rectangle in the plane of the selected floor panel.
@@ -45,6 +39,12 @@ Area mode follows the slope plane, previewing a continuous surface of 30 slope p
 The completed inclined surface, placed with one area zoop.
 
 ![Completed inclined surface built from 30 slope panels](Mods/images/07-slopes-zone-resultat.png)
+
+### Selection wheel (hold V)
+
+Hold **V**, point at a mode, then release to select it. A short tap cycles to the next mode.
+
+![Build Zoop selection wheel with seven building modes](Mods/images/01-roue-selection.png)
 
 Screenshots captured in a prepared single-player sandbox with free build, a fixed camera, and physics held still for framing. They illustrate the native zoop shapes and previews.
 
