@@ -4,15 +4,9 @@ Satisfactory-style **zoop** for **StellarDrive (Demo)**, plus everything Build P
 
 ## Screenshot gallery
 
-### Area — preview
-
-The blue hologram previews a 7 × 6 rectangle in the plane of the selected floor panel.
-
-![Blue holographic preview of a rectangular area of 42 floor panels](Mods/images/02-zone-apercu.png)
-
 ### Area — built result
 
-The same rectangle after placing all 42 floor panels with one zoop.
+A 7 × 6 rectangle of 42 floor panels placed with one zoop.
 
 ![Completed rectangular area containing 42 floor panels](Mods/images/03-zone-resultat.png)
 
