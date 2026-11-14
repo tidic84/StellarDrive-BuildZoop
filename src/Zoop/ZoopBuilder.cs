@@ -617,7 +617,7 @@ namespace BuildZoop.Zoop
                 {
                     foreach (var c in placement.CalculateAllCoords(settings.size))
                     {
-                        if (!seen.Add(new HullPartPosition(c, partType)) || !grid.IsHullPartAvailable(c, partType))
+                        if (!seen.Add(new HullPartPosition(c, partType)) || !grid.IsHullPartAvailable(new HullPartPosition(c, partType)))
                             ok = false;
                     }
                 }

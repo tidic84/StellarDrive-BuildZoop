@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.6.1 - 2026-11-13
+
+- Compatibility with the November 2026 StellarDrive Demo update: `IShipPartPlacements.IsHullPartAvailable` now takes a single `HullPartPosition`.
+- Checked every Harmony patch target, reflected field and save structure against the new game build (save format V15): all still match.
+
 ## 1.6.0 - 2026-10-31
 
 - Restore the game's original snapping by removing the patches on snap detection and occupied-voxel availability.
